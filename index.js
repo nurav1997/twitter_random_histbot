@@ -1,7 +1,7 @@
 require('dotenv').config()
 const { TwitterClient } = require('twitter-api-client')
 const axios = require('axios')
-const random = require('random')
+var cron = require('node-cron');
 
 //* PROVIDE TWITTER CREDENTIALS FOR CONNECTION TO API
 const twitterClient = new TwitterClient({
@@ -11,32 +11,53 @@ const twitterClient = new TwitterClient({
     accessTokenSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET
 });
 
-const TODAYS_DATE = new Date();
+var tweet;
 
-axios.get('https://en.wikipedia.org/api/rest_v1/feed/onthisday/all/' + TODAYS_DATE.getMonth() + '/' + TODAYS_DATE.getDate())
-    .then(response => {
+var options = {
+    method: 'GET',
+    url: 'https://random-stuff-api.p.rapidapi.com/ai',
+    params: { message: 'quote ', server: 'main' },
+    headers: {
+        authorization: 'bB8rdME4yYAU',
+        'x-rapidapi-host': 'random-stuff-api.p.rapidapi.com',
+        'x-rapidapi-key': 'de54571622msh9e0fd4122b8b210p114fb5jsn244379bcd9e3'
+    }
+};
 
-        const data = response.data ? response.data : {}
-        let tweet
-        if (data.events && data.events.length) {
-            //twee random event from the array
-            let RANDOM_NUMBER = random.int(0, data.events.length - 1);
-            tweet = '📅 Year ' + data.events[RANDOM_NUMBER].year + ' - ' + data.events[RANDOM_NUMBER].text;
-        } else {
-            tweet = 'Nothing happened today :)'
-        }
+// get quote from api
+function GetQuote() {
+    axios.request(options).then(async function (response) {
 
-        // using twitter client tweet to twitter account
-        twitterClient.tweets.statusesUpdate({
-            status: tweet
-        }).then(response => {
-            console.log("I have Just tweeted!! ==> ", tweet);
-        }).catch(err => {
-            console.error(err)
-        })
+        // tweet todays quote
+        tweet = '✨QUOTE ~ ' + response.data[0].response;
 
-    }).catch(err => {
-        console.error(err)
+        // call twitter client to tweet
+        await Tweety(tweet)
+        console.log("I Just tweeted ~ ", tweet)
+
+    }).catch(function (error) {
+        console.error(error);
+    });
+}
+
+// tweet status 
+async function Tweety(tweet) {
+    await twitterClient.tweets.statusesUpdate({
+        status: tweet
+    }).then(response => {
+        return response;
+    }).catch(error => {
+        console.error(error)
     })
+}
+
+// call for the first time the program starts
+GetQuote()
+
+// cron scheduler for every one minute past 5 hours 
+cron.schedule('0 */5 * * *', () => {
+    GetQuote()
+    console.log('running a task every 5 Hours');
+});
 
 
